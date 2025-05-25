@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Smart Portfolio Reviewer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+  body {
+    margin: 0;
+    font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #4e54c8, #8f94fb);
+    min-height: 100vh;
+    color: #f0f0f5;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+
+  h1 {
+    font-weight: 600;
+    font-size: 2.8rem;
+    margin-bottom: 10px;
+    text-align: center;
+    text-shadow: 0 0 8px rgba(0,0,0,0.3);
+  }
+
+  p.subtitle {
+    font-weight: 400;
+    font-size: 1.1rem;
+    margin-bottom: 30px;
+    color: #dcdcffdd;
+    text-align: center;
+    max-width: 500px;
+  }
+
+  form {
+    width: 100%;
+    max-width: 480px;
+    display: flex;
+    gap: 12px;
+  }
+
+  input[type="url"] {
+    flex-grow: 1;
+    padding: 14px 18px;
+    border: none;
+    border-radius: 8px;
+    font-size: 1rem;
+    outline: none;
+    transition: box-shadow 0.3s ease;
+  }
+  input[type="url"]:focus {
+    box-shadow: 0 0 10px 2px #8f94fbaa;
+  }
+
+  button {
+    background-color: #6c63ff;
+    border: none;
+    padding: 14px 24px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+  }
+  button:hover:not(:disabled) {
+    background-color: #574fd6;
+  }
+  button:disabled {
+    background-color: #a29ff3;
+    cursor: not-allowed;
+  }
+
+  .feedback-container {
+    margin-top: 40px;
+    width: 100%;
+    max-width: 640px;
+    background: rgba(255 255 255 / 0.1);
+    border-radius: 15px;
+    padding: 30px 30px 35px 30px;
+    box-shadow: 0 0 30px 4px rgba(143,148,251,0.4);
+    backdrop-filter: blur(14px);
+  }
+
+  .feedback-category {
+    margin-bottom: 30px;
+  }
+  .feedback-category:last-child {
+    margin-bottom: 0;
+  }
+
+  .category-title {
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin-bottom: 10px;
+    color: #e1e1ff;
+    text-shadow: 0 0 4px rgba(0,0,0,0.3);
+  }
+  .category-text {
+    font-size: 1rem;
+    line-height: 1.5;
+    color: #dcdcffdd;
+  }
+
+  .rating {
+    margin-top: 8px;
+    display: inline-flex;
+    gap: 6px;
+  }
+  .star {
+    width: 26px;
+    height: 26px;
+    fill: #bbbce0;
+    transition: fill 0.3s ease;
+  }
+  .star.filled {
+    fill: #ffd93b;
+    filter: drop-shadow(0 0 1px #f0c801);
+  }
+
+  .loader {
+    margin-top: 50px;
+    border: 5px solid rgba(255 255 255 / 0.1);
+    border-top: 5px solid #6c63ff;
+    border-radius: 50%;
+    width: 42px;
+    height: 42px;
+    animation: spin 1.3s linear infinite;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  @keyframes spin {
+    to {transform: rotate(360deg);}
+  }
+
+  footer {
+    margin-top: auto;
+    color: #cbcaff99;
+    font-size: 0.9rem;
+    padding: 15px;
+    text-align: center;
+  }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    h1 {
+      font-size: 2.2rem;
+    }
+    form {
+      flex-direction: column;
+    }
+    button {
+      width: 100%;
+    }
+    input[type="url"] {
+      width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+  <h1>Smart Portfolio Reviewer</h1>
+  <p class="subtitle">Submit your portfolio link and get instant AI feedback on design, accessibility, and responsiveness — with ratings.</p>
+  <form id="portfolioForm" novalidate>
+    <input type="url" id="portfolioUrl" placeholder="Enter your portfolio URL (e.g. https://yourportfolio.com)" required aria-label="Portfolio URL" />
+    <button type="submit">Analyze</button>
+  </form>
+
+  <div id="result" class="feedback-container" role="region" aria-live="polite" aria-atomic="true" style="display:none;">
+    <div class="feedback-category" id="design-feedback">
+      <h2 class="category-title">Design Feedback</h2>
+      <p class="category-text" id="design-text"></p>
+      <div class="rating" aria-label="Design rating" id="design-rating"></div>
+    </div>
+    <div class="feedback-category" id="accessibility-feedback">
+      <h2 class="category-title">Accessibility Feedback</h2>
+      <p class="category-text" id="accessibility-text"></p>
+      <div class="rating" aria-label="Accessibility rating" id="accessibility-rating"></div>
+    </div>
+    <div class="feedback-category" id="responsiveness-feedback">
+      <h2 class="category-title">Responsiveness Feedback</h2>
+      <p class="category-text" id="responsiveness-text"></p>
+      <div class="rating" aria-label="Responsiveness rating" id="responsiveness-rating"></div>
+    </div>
+  </div>
+
+  <div id="loader" class="loader" style="display:none;" aria-label="Loading, please wait"></div>
+
+<script>
+  // Utility: create star SVG
+  function createStar(filled = false) {
+    const ns = "http://www.w3.org/2000/svg";
+    const star = document.createElementNS(ns, "svg");
+    star.setAttribute("viewBox", "0 0 24 24");
+    star.setAttribute("class", "star");
+    if (filled) star.classList.add("filled");
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", "M12 .587l3.668 7.431 8.2 1.192-5.934 5.783 1.4 8.172L12 18.897l-7.334 3.848 1.4-8.172-5.934-5.783 8.2-1.192z");
+    star.appendChild(path);
+    return star;
+  }
+
+  // Simulated AI analysis function
+  function analyzePortfolio(url) {
+    return new Promise((resolve) => {
+      setTimeout(() => {
+        // For demonstration, generate deterministic fixed feedback based on hash of URL
+        function hashString(str) {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = (hash << 5) - hash + str.charCodeAt(i);
+            hash |= 0; // to 32bit int
+          }
+          return Math.abs(hash);
+        }
+        const h = hashString(url);
+        // Simple message sets
+        const designMessages = [
+          "Great use of whitespace and typography for a clean look.",
+          "Consider improving visual hierarchy for easier navigation.",
+          "Color palette is harmonious and pleasing to the eye.",
+          "Design feels a bit cluttered, try simplifying elements.",
+          "Excellent balance of visuals and content."
+        ];
+        const accessibilityMessages = [
+          "Good use of semantic HTML and color contrast.",
+          "Some text elements may have insufficient contrast.",
+          "Alt texts for images are well implemented.",
+          "Keyboard navigation could be improved for better accessibility.",
+          "Forms and buttons are properly labeled."
+        ];
+        const responsivenessMessages = [
+          "Smooth and adaptable layout across devices.",
+          "Some content overlaps on smaller screens, needs adjustment.",
+          "Navigation is easy on mobile devices.",
+          "Images resize properly on various screen sizes.",
+          "Consider optimizing touch targets on mobile."
+        ];
+
+        const designIdx = h % designMessages.length;
+        const accessibilityIdx = (h >> 3) % accessibilityMessages.length;
+        const responsivenessIdx = (h >> 6) % responsivenessMessages.length;
+
+        // Ratings from 2 to 5 stars (simulate)
+        const designRating = 2 + (h % 4);
+        const accessibilityRating = 2 + ((h >> 4) % 4);
+        const responsivenessRating = 2 + ((h >> 7) % 4);
+
+        resolve({
+          design: {
+            feedback: designMessages[designIdx],
+            rating: designRating
+          },
+          accessibility: {
+            feedback: accessibilityMessages[accessibilityIdx],
+            rating: accessibilityRating
+          },
+          responsiveness: {
+            feedback: responsivenessMessages[responsivenessIdx],
+            rating: responsivenessRating
+          }
+        });
+      }, 1500); // simulate delay 1.5s
+    });
+  }
+
+  // Fill rating stars for a container
+  function fillRating(container, rating) {
+    container.innerHTML = "";
+    for (let i = 1; i <= 5; i++) {
+      const star = createStar(i <= rating);
+      container.appendChild(star);
+    }
+  }
+
+  // Form and UI logic
+  const form = document.getElementById('portfolioForm');
+  const inputUrl = document.getElementById('portfolioUrl');
+  const resultDiv = document.getElementById('result');
+  const loader = document.getElementById('loader');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const url = inputUrl.value.trim();
+    // Simple URL validation
+    if (!url || !isValidUrl(url)) {
+      alert("Please enter a valid portfolio URL starting with http(s)://");
+      inputUrl.focus();
+      return;
+    }
+    // Clear previous
+    resultDiv.style.display = "none";
+    loader.style.display = "block";
+
+    // Run the "AI" analysis
+    try {
+      const analysis = await analyzePortfolio(url);
+      // Update UI with feedback
+      document.getElementById('design-text').textContent = analysis.design.feedback;
+      fillRating(document.getElementById('design-rating'), analysis.design.rating);
+
+      document.getElementById('accessibility-text').textContent = analysis.accessibility.feedback;
+      fillRating(document.getElementById('accessibility-rating'), analysis.accessibility.rating);
+
+      document.getElementById('responsiveness-text').textContent = analysis.responsiveness.feedback;
+      fillRating(document.getElementById('responsiveness-rating'), analysis.responsiveness.rating);
+
+      loader.style.display = "none";
+      resultDiv.style.display = "block";
+      resultDiv.focus();
+    } catch (e) {
+      loader.style.display = "none";
+      alert("An error occurred while analyzing the portfolio. Please try again.");
+    }
+  });
+
+  // Basic URL validation function
+  function isValidUrl(s) {
+    try {
+      const url = new URL(s);
+      return url.protocol === "http:" || url.protocol === "https:";
+    } catch (err) {
+      return false;
+    }
+  }
+
+</script>
+
+<footer>
+  &copy; <i>Fenics<br> 24/05/2025</i>
+</footer>
+</body>
+</html>
+
